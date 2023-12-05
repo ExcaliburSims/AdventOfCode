@@ -1,35 +1,54 @@
-let input = `1000
-2000
-3000
-4000
-5000
-6000
-7000
-8000
-9000
-10000`;
+const fs = require('fs');
 
-input = input.split("\n");
-
-let elf = 0; // Elf selector
-let elves = []; // Array of all elve's total weights
-let winner = 0; // Elf with the most weight
-
-for (let i = 0; i < input.length; i++) {
-  if (input[i] == "") elf++; // If newline, switch to next elf
-  else
-    elves[elf]
-      ? (elves[elf] += parseInt(input[i]))
-      : (elves[elf] = parseInt(input[i])); // Add calories of current line to current elf's total
+// Fonction pour lire le contenu d'un fichier
+function readFile(path) {
+    try {
+        const buf = fs.readFileSync(path, 'utf8');
+        return buf.toString();
+    } catch (err) {
+        console.error("Couldn't read file:", err);
+        process.exit(1);
+    }
 }
 
-elves.sort((a, b) => {
-  return a - b;
-}); // Why is this such a hassle in javascript
+// Fonction pour calculer la somme d'une liste d'entiers
+function listSum(someList) {
+    return someList.reduce((sum, item) => sum + item, 0);
+}
 
-console.log("Biggest amount:", elves.at(-1));
+// Fonction pour trouver le maximum dans une liste d'entiers
+function findMax(someList) {
+    return Math.max(...someList);
+}
 
-console.log(
-  "Total of top 3 elves:",
-  elves.at(-1) + elves.at(-2) + elves.at(-3),
-);
+// Fonction pour convertir une liste de chaînes représentant des entiers en une liste de sommes triées
+function strIntListsToSumsSorted(strIntLists) {
+    const intList = strIntLists.map(strIntList => {
+        const ints = strIntList.split('\n').map(strValue => parseInt(strValue));
+        return listSum(ints);
+    });
+
+    return intList.sort((a, b) => a - b);
+}
+
+// Fonction pour résoudre la partie 1
+function p1(input) {
+    const sums = strIntListsToSumsSorted(input.split('\n\n'));
+    return findMax(sums);
+}
+
+// Fonction pour résoudre la partie 2
+function p2(input) {
+    const sums = strIntListsToSumsSorted(input.split('\n\n'));
+    return listSum(sums.slice(-3));
+}
+
+// Fonction principale
+function main() {
+    const input = readFile('./input.txt');
+    console.log('p1:', p1(input));
+    console.log('p2:', p2(input));
+}
+
+// Exécution de la fonction principale
+main();
