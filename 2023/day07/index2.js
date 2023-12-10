@@ -1,161 +1,103 @@
-const fs = require('fs');
+const HAND_RANKS = [
+    [5],            // Five-of-a-kind
+    [4, 1],         // Four-of-a-kind
+    [3, 2],         // Full House
+    [3, 1, 1],      // Three-of-a-kind
+    [2, 2, 1],      // Two-pair
+    [2, 1, 1, 1],   // One-pair
+    [1, 1, 1, 1, 1] // High-card
+];
 
-const HIGH_CARD = 0;
-const ONE_PAIR = 1;
-const TWO_PAIR = 2;
-const THREE_OF_A_KIND = 3;
-const FULL_HOUSE = 4;
-const FOUR_OF_A_KIND = 5;
-const FIVE_OF_A_KIND = 6;
+const CARD_ORDER = [
+    "A",
+    "K",
+    "Q",
+    "T",
+    "9",
+    "8",
+    "7",
+    "6",
+    "5",
+    "4",
+    "3",
+    "2",
+    "J"
+];
 
-function parse(filename) {
-    const input = fs.readFileSync(filename, 'utf-8');
-    const hands = [];
+function identifyRankPattern(hand) {
+    const uniqueCards = {};
 
-    for (const line of input.split('\n')) {
-        if (line.trim() === '') {
+    for (const card of hand) {
+        uniqueCards[card] = (uniqueCards[card] || 0) + 1;
+    }
+
+    if (uniqueCards["J"] && uniqueCards["J"] !== 5) {
+        const numJokers = uniqueCards["J"];
+        delete uniqueCards["J"];
+        const mostCards = Object.keys(uniqueCards).reduce((a, b) => uniqueCards[a] > uniqueCards[b] ? a : b);
+        uniqueCards[mostCards] += numJokers;
+    }
+
+    return Object.values(uniqueCards).sort((a, b) => b - a);
+}
+
+function betterHand(hand1, hand2) {
+    const rank1Pattern = identifyRankPattern(hand1);
+    const rank2Pattern = identifyRankPattern(hand2);
+
+    let rank1, rank2;
+    for (let i = 0; i < HAND_RANKS.length; i++) {
+        if (JSON.stringify(HAND_RANKS[i]) === JSON.stringify(rank1Pattern)) {
+            rank1 = i;
+        }
+        if (JSON.stringify(HAND_RANKS[i]) === JSON.stringify(rank2Pattern)) {
+            rank2 = i;
+        }
+    }
+
+    if (rank1 > rank2) {
+        return -1;
+    } else if (rank2 > rank1) {
+        return 1;
+    }
+
+    for (let i = 0; i < hand1.length; i++) {
+        if (hand1[i] === hand2[i]) {
             continue;
         }
 
-        const pos = line.indexOf(' ');
-        const cards = line.slice(0, pos).split('').map(c => c.charCodeAt(0));
-        const countMap = new Map();
-
-        for (const c of cards) {
-            countMap.set(c, (countMap.get(c) || 0) + 1);
-        }
-
-        const bid = parseInt(line.slice(pos + 1), 10);
-
-        const counts = Array.from(countMap.values());
-        counts.sort((a, b) => b - a);
-
-        hands.push({
-            cards,
-            bid,
-            counts,
-        });
-    }
-
-    return hands;
-}
-
-class Hand {
-    constructor(cards, bid, counts) {
-        this.cards = cards;
-        this.bid = bid;
-        this.counts = counts;
-    }
-
-    type() {
-        if (this.counts[0] >= 5) {
-            return FIVE_OF_A_KIND;
-        } else if (this.counts[0] >= 4) {
-            return FOUR_OF_A_KIND;
-        } else if (this.counts[0] >= 3 && this.counts[1] >= 2) {
-            return FULL_HOUSE;
-        } else if (this.counts[0] >= 3) {
-            return THREE_OF_A_KIND;
-        } else if (this.counts[0] >= 2 && this.counts[1] >= 2) {
-            return TWO_PAIR;
-        } else if (this.counts[0] >= 2) {
-            return ONE_PAIR;
-        }
-
-        return HIGH_CARD;
-    }
-
-    distributeJokers() {
-        const countMap = new Map();
-
-        for (const c of this.cards) {
-            countMap.set(c, (countMap.get(c) || 0) + 1);
-        }
-
-        // in case we only counted a single card type (incl. jokers)
-        if (countMap.size === 1) {
-            this.counts = [5];
-            return;
-        }
-
-        const counts = Array.from(countMap.values()).filter(card => card !== 'J');
-        counts.sort((a, b) => b - a);
-
-        let nJokers = countMap.get('J') || 0;
-        const diff = Math.max(0, 3 - counts[0]);
-        counts[0] += nJokers;
-        nJokers -= diff;
-
-        if (counts.length > 1 && nJokers > 0) {
-            counts[1] += nJokers;
-        }
-
-        this.counts = counts;
-    }
-}
-
-function solve(hands, cardValues) {
-    hands.sort((a, b) => {
-        const diff = a.type() - b.type();
-
-        if (diff === 0) {
-            for (let c = 0; c < a.cards.length; c++) {
-                if (a.cards[c] === b.cards[c]) {
-                    continue;
-                }
-
-                return cardValues[a.cards[c]] < cardValues[b.cards[c]];
+        for (const card of CARD_ORDER) {
+            if (card === hand1[i]) {
+                return 1;
+            } else if (card === hand2[i]) {
+                return -1;
             }
         }
-
-        return diff < 0;
-    });
-
-    let winnings = 0;
-
-    for (let rank = 0; rank < hands.length; rank++) {
-        const h = hands[rank];
-        winnings += (rank + 1) * h.bid;
     }
 
-    return winnings;
+    return 0;
 }
 
 function main() {
-    const timeStart = Date.now();
-    const hands = parse("input.txt");
+    const game = [];
 
-    const cardValues = {
-        '2': 1,
-        '3': 2,
-        '4': 3,
-        '5': 4,
-        '6': 5,
-        '7': 6,
-        '8': 7,
-        '9': 8,
-        'T': 9,
-        'J': 10,
-        'H': 11,
-        'Q': 12,
-        'K': 13,
-        'A': 14,
-    };
+    const fs = require('fs');
+    const input = fs.readFileSync("./input.txt", "utf-8").split('\n');
 
-    const a1 = solve(hands, cardValues);
-
-    cardValues['J'.charCodeAt(0)] = 0;
-
-    for (let i = 0; i < hands.length; i++) {
-        hands[i].distributeJokers();
+    for (const line of input) {
+        const [hand, bid] = line.split(" ");
+        game.push([hand, parseInt(bid)]);
     }
 
-    const a2 = solve(hands, cardValues);
+    game.sort((a, b) => betterHand(a[0], b[0]));
 
-    console.log("--- Day 7: Camel Cards ---");
-    console.log(`Part 1: ${a1}`);
-    console.log(`Part 2: ${a2}`);
-    console.log(`Time: ${(Date.now() - timeStart).toFixed(2)}ms`);
+    let totalWinnings = 0;
+
+    for (let i = 0; i < game.length; i++) {
+        totalWinnings += game[i][1] * (i + 1);
+    }
+
+    console.log(totalWinnings);
 }
 
 main();
